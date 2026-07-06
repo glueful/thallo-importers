@@ -55,7 +55,7 @@ final class ImportersServiceProvider extends ServiceProvider
     {
         container($context)->get(CapabilityRegistry::class)->register(
             new Capability(
-                'lemma.importers',
+                'thallo.importers',
                 label: 'Content importers',
                 description: 'CSV, Markdown and WordPress content/user import adapters.',
             ),
