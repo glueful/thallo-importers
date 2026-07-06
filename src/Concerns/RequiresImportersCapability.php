@@ -12,7 +12,7 @@ trait RequiresImportersCapability
     private function assertImportersEnabled(CapabilityRegistry $capabilities): void
     {
         if (!$capabilities->isEnabled('thallo.importers')) {
-            throw new ForbiddenException('The lemma.importers capability is disabled.');
+            throw new ForbiddenException('The thallo.importers capability is disabled.');
         }
     }
 }
