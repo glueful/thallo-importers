@@ -1,12 +1,12 @@
-# glueful/lemma-importers
+# glueful/thallo-importers
 
-Content **format importers** for [Lemma](https://getlemma.dev) — CSV, Markdown/MDX, and
+Content **format importers** for [Thallo](https://thallo.dev) — CSV, Markdown/MDX, and
 WordPress (WXR) ingestion, plus CSV user provisioning — packaged as a **removable capability
-pack**. It writes all content through Lemma's public `ContentWriter` contract and never reaches
+pack**. It writes all content through Thallo's public `ContentWriter` contract and never reaches
 into the application; install it, disable it, or `composer remove` it without touching the core.
 
-It is the reference pack of the [composable-core](../../docs/superpowers/specs/2026-06-28-lemma-composable-core-design.md)
-architecture: a real `glueful-extension` that depends only on `glueful/lemma-contracts` (+ the
+It is the reference pack of the [composable-core](../../docs/superpowers/specs/2026-06-28-thallo-composable-core-design.md)
+architecture: a real `glueful-extension` that depends only on `glueful/thallo-contracts` (+ the
 framework and `glueful/import-export`), declares a capability, and contributes a capability-gated
 admin surface.
 
@@ -40,49 +40,49 @@ provisioning by an admin who vouches for the addresses) — don't import unvette
 The provider registers a single capability in `boot()`:
 
 ```php
-new Capability('lemma.importers', label: 'Content importers', description: '…');
+new Capability('thallo.importers', label: 'Content importers', description: '…');
 ```
 
-- **Enabled by default.** Disable it by setting `'lemma.importers' => false` in `config/lemma.php`'s
+- **Enabled by default.** Disable it by setting `'thallo.importers' => false` in `config/thallo.php`'s
   `capabilities` switchboard.
 - **Backend-gated, not just UI.** Every adapter calls `assertImportersEnabled()` (the
   `RequiresImportersCapability` trait) as the first line of its plan step — so a direct
-  `POST /import-export/imports` for a Lemma adapter **fails closed** when the capability is disabled,
+  `POST /import-export/imports` for a Thallo adapter **fails closed** when the capability is disabled,
   not only the admin controls.
 - **UI-gated.** The admin's format-import controls (Settings → Import / Export) and the users
-  bulk-CSV-import are shown only when `lemma.importers` is enabled (via the admin capabilities store).
+  bulk-CSV-import are shown only when `thallo.importers` is enabled (via the admin capabilities store).
 
 ## Boundary
 
-This package depends on `glueful/lemma-contracts`, `glueful/framework`, `glueful/import-export`,
-`glueful/users`, `glueful/aegis`, and `league/commonmark` — and **never** on `glueful/lemma` (the
+This package depends on `glueful/thallo-contracts`, `glueful/framework`, `glueful/import-export`,
+`glueful/users`, `glueful/aegis`, and `league/commonmark` — and **never** on `glueful/thallo` (the
 application). The repo's `composer boundaries` check enforces this at both the Composer-dependency
 and the source level (no `App\` references in `src/`).
 
 ## Install
 
-The pack is **bundled by default** in the Lemma create-project template, so a fresh app has it
+The pack is **bundled by default** in the Thallo create-project template, so a fresh app has it
 already. To add it to an existing app (it lives as a path package in this monorepo):
 
-1. `composer require glueful/lemma-importers`
-2. `./lemma extensions:enable lemma-importers` (writes the provider into the
+1. `composer require glueful/thallo-importers`
+2. `./thallo extensions:enable thallo-importers` (writes the provider into the
    `config/extensions.php` allow-list and recompiles the extension cache)
 
 ## Remove
 
-`./lemma extensions:disable lemma-importers`, then `composer remove glueful/lemma-importers`. After
+`./thallo extensions:disable thallo-importers`, then `composer remove glueful/thallo-importers`. After
 removal:
 
 - The headless CMS core boots; content delivery and the admin work unchanged.
 - **Snapshot export/import still works** — the full-database NDJSON snapshot engine
-  (`LemmaContentExporter` / `LemmaContentImporter`), its `/v1/admin/import-export/upload|download`
+  (`ContentExporter` / `ContentImporter`), its `/v1/admin/import-export/upload|download`
   endpoints, and the snapshot UI are **core-owned**, not part of this pack.
-- The `lemma.importers` capability disappears from `GET /v1/admin/capabilities`, so the format-import
+- The `thallo.importers` capability disappears from `GET /v1/admin/capabilities`, so the format-import
   admin section and the users bulk-CSV import hide automatically.
 
 
 ## Not included (deliberately)
 
-Snapshot/backup **restore** (raw NDJSON of Lemma's own tables, versions, routes, publications, and
-blob manifest) stays in core — it necessarily understands Lemma's internal storage model, so it is
-not "import through the public content API" and is not exposed through `lemma-contracts`.
+Snapshot/backup **restore** (raw NDJSON of Thallo's own tables, versions, routes, publications, and
+blob manifest) stays in core — it necessarily understands Thallo's internal storage model, so it is
+not "import through the public content API" and is not exposed through `thallo-contracts`.
