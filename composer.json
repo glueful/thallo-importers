@@ -1,7 +1,7 @@
 {
   "name": "glueful/thallo-importers",
   "description": "Thallo content format importers (CSV / Markdown / WordPress) as a removable capability pack.",
-  "type": "glueful-extension",
+  "type": "library",
   "license": "MIT",
   "authors": [
     {
