@@ -5,7 +5,7 @@ WordPress (WXR) ingestion, plus CSV user provisioning — packaged as a **remova
 pack**. It writes all content through Thallo's public `ContentWriter` contract and never reaches
 into the application; install it, disable it, or `composer remove` it without touching the core.
 
-It is the reference pack of the [composable-core](../../docs/superpowers/specs/2026-06-28-thallo-composable-core-design.md)
+It is the reference pack of the [composable-core](../../docs/internal/superpowers/specs/2026-06-28-thallo-composable-core-design.md)
 architecture: a real `glueful-extension` that depends only on `glueful/thallo-contracts` (+ the
 framework and `glueful/import-export`), declares a capability, and contributes a capability-gated
 admin surface.
