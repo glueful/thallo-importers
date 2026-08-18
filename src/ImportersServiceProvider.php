@@ -75,6 +75,7 @@ final class ImportersServiceProvider extends ServiceProvider implements Declares
                 'thallo.importers',
                 label: 'Content importers',
                 description: 'CSV, Markdown and WordPress content/user import adapters.',
+                owningPackage: 'glueful/import-export',
             ),
         );
     }
