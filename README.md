@@ -86,3 +86,10 @@ removal:
 Snapshot/backup **restore** (raw NDJSON of Thallo's own tables, versions, routes, publications, and
 blob manifest) stays in core — it necessarily understands Thallo's internal storage model, so it is
 not "import through the public content API" and is not exposed through `thallo-contracts`.
+
+## Contributing
+
+This repository is a read-only mirror, published from
+[glueful/thallo](https://github.com/glueful/thallo) on every release; its `main` is overwritten
+by the next split, so nothing can land here. Issues and pull requests belong in glueful/thallo,
+where this code lives at `packages/thallo-importers/`.
