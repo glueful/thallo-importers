@@ -211,7 +211,7 @@ final class MarkdownFolderImport
      * The draft is the import's; publishing may be the site's to gate (a review workflow). A gated
      * publish leaves the draft written and says so, rather than failing the file.
      *
-     * @return array{message?: string}
+     * @return array{message?: string, publish_held?: bool}
      */
     private function publish(string $entry, string $locale, bool $publish, ?string $actor): array
     {
@@ -222,8 +222,7 @@ final class MarkdownFolderImport
             $this->writer->publish($entry, $locale, $actor);
             return [];
         } catch (PublishBlocked $e) {
-            return ['message' => 'Saved as a draft, not published: ' . $e->getMessage()
-                . ' Pass --actor=<user uuid> for a user allowed to bypass review.'];
+            return ['publish_held' => true, 'message' => 'Saved as a draft, not published: ' . $e->getMessage()];
         }
     }
 

@@ -12,13 +12,14 @@ admin surface.
 
 ## What it provides
 
-Four import adapters, registered with the `import_export.importer` container tag and discovered by
+Five import adapters, registered with the `import_export.importer` container tag and discovered by
 the `glueful/import-export` engine:
 
 | Adapter key        | Label              | What it ingests |
 |--------------------|--------------------|-----------------|
 | `csv.content`      | CSV                | One content entry per CSV row; fields ↔ columns. |
 | `markdown.content` | Markdown / MDX     | YAML front matter → fields; body → a chosen `text` field (raw vs HTML by the field's `format`). |
+| `markdown.folder`  | Markdown folder (.zip) | A folder of Markdown as the pages of a content type — a documentation section. The import `thallo:import:markdown` runs, from an upload: repeatable, and it never deletes. See `docs/documentation-sites.md`. |
 | `wordpress.content`| WordPress (WXR)    | Posts/pages from a WXR export; title/excerpt/slug/date/status/author + content. |
 | `csv.users`        | Users (CSV)        | Bulk user provisioning (profile + roles) via `glueful/users` + `glueful/aegis`. |
 
@@ -32,7 +33,9 @@ fast instead of silently importing entries with missing data.
 **Imported files are treated as untrusted.** Markdown bodies are rendered with raw HTML stripped
 and unsafe link schemes dropped; WordPress HTML bodies are run through `symfony/html-sanitizer`
 (safe elements only — scripts, iframes, event handlers, and `javascript:` URLs are removed) before
-being stored. **User provisioning note:** imported accounts are stamped email-verified (bulk
+being stored. A `.zip` is unpacked by `Markdown\MarkdownZip`, which writes only Markdown files,
+refuses an archive holding a name that points outside the import, and counts the bytes it really
+reads against a cap. **User provisioning note:** imported accounts are stamped email-verified (bulk
 provisioning by an admin who vouches for the addresses) — don't import unvetted address lists.
 
 ## The capability

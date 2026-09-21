@@ -12,6 +12,7 @@ use Thallo\Contracts\Capability\CapabilityRegistry;
 use Thallo\Importers\CsvContentImporter;
 use Thallo\Importers\CsvUserImporter;
 use Thallo\Importers\MarkdownContentImporter;
+use Thallo\Importers\MarkdownZipImporter;
 use Thallo\Importers\WordpressContentImporter;
 
 final class ImportersServiceProvider extends ServiceProvider implements DeclaresLoadOrder
@@ -50,6 +51,12 @@ final class ImportersServiceProvider extends ServiceProvider implements Declares
             ],
             MarkdownContentImporter::class => [
                 'class'    => MarkdownContentImporter::class,
+                'shared'   => true,
+                'autowire' => true,
+                'tags'     => ['import_export.importer'],
+            ],
+            MarkdownZipImporter::class => [
+                'class'    => MarkdownZipImporter::class,
                 'shared'   => true,
                 'autowire' => true,
                 'tags'     => ['import_export.importer'],

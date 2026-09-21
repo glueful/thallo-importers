@@ -95,6 +95,11 @@ final class ImportMarkdownCommand extends BaseCommand
             );
         }
 
+        $held = array_filter($report['files'], static fn (array $f): bool => ($f['publish_held'] ?? false) === true);
+        if ($held !== []) {
+            $this->warning('  Pass --actor=<user uuid> for a user allowed to bypass review.');
+        }
+
         $c = $report['counts'];
         $summary = sprintf(
             '%s%d created, %d updated, %d unchanged, %d skipped, %d failed.',
