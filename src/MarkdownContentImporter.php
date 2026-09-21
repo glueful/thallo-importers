@@ -20,6 +20,7 @@ use Thallo\Contracts\Capability\CapabilityRegistry;
 use Thallo\Contracts\Schema\ContentTypeReader;
 use Thallo\Importers\Concerns\ReadsImportSource;
 use Thallo\Importers\Concerns\RequiresImportersCapability;
+use Thallo\Importers\Markdown\FrontMatter;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\DisallowedRawHtml\DisallowedRawHtmlExtension;
@@ -134,7 +135,7 @@ final class MarkdownContentImporter implements ImporterInterface, RetryableAdapt
         }
 
         try {
-            $document = $this->parseDocument($this->readSource($context->jobUuid));
+            $document = FrontMatter::split($this->readSource($context->jobUuid));
 
             $payload = [];
             foreach ($mapping as $field => $key) {
@@ -209,52 +210,6 @@ final class MarkdownContentImporter implements ImporterInterface, RetryableAdapt
                 );
             }
         }
-    }
-
-    /**
-     * Split a document into its flat front matter (the leading `---` block, parsed as `key: value`)
-     * and the remaining body. Only flat scalar front matter is supported in v1.
-     *
-     * @return array{front: array<string,string>, body: string}
-     */
-    private function parseDocument(string $raw): array
-    {
-        $raw = ltrim($raw);
-        if (!str_starts_with($raw, '---')) {
-            return ['front' => [], 'body' => $raw];
-        }
-
-        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
-        $end = null;
-        for ($i = 1, $n = count($lines); $i < $n; $i++) {
-            if (trim($lines[$i]) === '---') {
-                $end = $i;
-                break;
-            }
-        }
-        if ($end === null) {
-            return ['front' => [], 'body' => $raw];
-        }
-
-        $front = [];
-        foreach (array_slice($lines, 1, $end - 1) as $line) {
-            if (preg_match('/^([A-Za-z0-9_\-]+)\s*:\s*(.*)$/', $line, $m) === 1) {
-                $front[$m[1]] = $this->unquote(trim($m[2]));
-            }
-        }
-
-        return ['front' => $front, 'body' => implode("\n", array_slice($lines, $end + 1))];
-    }
-
-    private function unquote(string $value): string
-    {
-        if (strlen($value) >= 2) {
-            $first = $value[0];
-            if (($first === '"' || $first === "'") && $value[strlen($value) - 1] === $first) {
-                return substr($value, 1, -1);
-            }
-        }
-        return $value;
     }
 
     private function toHtml(string $markdown): string

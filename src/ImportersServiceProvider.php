@@ -54,6 +54,16 @@ final class ImportersServiceProvider extends ServiceProvider implements Declares
                 'autowire' => true,
                 'tags'     => ['import_export.importer'],
             ],
+            \Thallo\Importers\Markdown\MarkdownFolderImport::class => [
+                'class'    => \Thallo\Importers\Markdown\MarkdownFolderImport::class,
+                'shared'   => true,
+                'autowire' => true,
+            ],
+            \Thallo\Importers\Console\ImportMarkdownCommand::class => [
+                'class'    => \Thallo\Importers\Console\ImportMarkdownCommand::class,
+                'shared'   => true,
+                'autowire' => true,
+            ],
             WordpressContentImporter::class => [
                 'class'    => WordpressContentImporter::class,
                 'shared'   => true,
@@ -78,5 +88,7 @@ final class ImportersServiceProvider extends ServiceProvider implements Declares
                 owningPackage: 'glueful/import-export',
             ),
         );
+        // Console-only (a no-op in the HTTP phase): the folder import a deploy script runs.
+        $this->commands([\Thallo\Importers\Console\ImportMarkdownCommand::class]);
     }
 }
