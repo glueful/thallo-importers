@@ -1,14 +1,14 @@
 # glueful/thallo-importers
 
 Content **format importers** for [Thallo](https://thallo.dev) — CSV, Markdown/MDX, and
-WordPress (WXR) ingestion, plus CSV user provisioning — packaged as a **removable capability
-pack**. It writes all content through Thallo's public `ContentWriter` contract and never reaches
-into the application; install it, disable it, or `composer remove` it without touching the core.
+WordPress (WXR) ingestion, plus CSV user provisioning — packaged as a **capability pack**. It
+writes all content through Thallo's public `ContentWriter` contract and never reaches into the
+application; an operator can switch it off without touching the core.
 
-It is the reference pack of the [composable-core](../../docs/internal/superpowers/specs/2026-06-28-thallo-composable-core-design.md)
-architecture: a real `glueful-extension` that depends only on `glueful/thallo-contracts` (+ the
-framework and `glueful/import-export`), declares a capability, and contributes a capability-gated
-admin surface.
+It is the reference pack of the [composable-core](../../docs/internal/superpowers/specs/2026-06-28-lemma-composable-core-design.md)
+architecture: a library package that depends only on `glueful/thallo-contracts` (+ the framework
+and `glueful/import-export`), declares a capability, and contributes a capability-gated admin
+surface.
 
 ## What it provides
 
@@ -46,8 +46,12 @@ The provider registers a single capability in `boot()`:
 new Capability('thallo.importers', label: 'Content importers', description: '…');
 ```
 
-- **Enabled by default.** Disable it by setting `'thallo.importers' => false` in `config/thallo.php`'s
-  `capabilities` switchboard.
+- **Follows its engine.** The capability's owning package is `glueful/import-export`. Left
+  untouched, it is on whenever that extension is enabled, which it is in a new project's
+  `config/extensions.php`. An operator turns it off or on in the admin under **Extensions ›
+  Capabilities**; the switch is stored system-wide and overrides the deploy-time
+  `thallo.capabilities` config map. Enabling is refused while `glueful/import-export` is not
+  enabled and schema-ready.
 - **Backend-gated, not just UI.** Every adapter calls `assertImportersEnabled()` (the
   `RequiresImportersCapability` trait) as the first line of its plan step — so a direct
   `POST /import-export/imports` for a Thallo adapter **fails closed** when the capability is disabled,
@@ -60,29 +64,21 @@ new Capability('thallo.importers', label: 'Content importers', description: '…
 This package depends on `glueful/thallo-contracts`, `glueful/framework`, `glueful/import-export`,
 `glueful/users`, `glueful/aegis`, and `league/commonmark` — and **never** on `glueful/thallo` (the
 application). The repo's `composer boundaries` check enforces this at both the Composer-dependency
-and the source level (no `App\` references in `src/`).
+and the source level (no `Thallo\Core\` references in `src/` or `routes/`).
 
 ## Install
 
-The pack is **bundled by default** in the Thallo create-project template, so a fresh app has it
-already. To add it to an existing app (it lives as a path package in this monorepo):
+The pack ships with Thallo: `glueful/thallo-core` requires it at the same version and the project's
+`config/serviceproviders.php` loads its provider, so there is nothing to install or enable per pack.
 
-1. `composer require glueful/thallo-importers`
-2. `./thallo extensions:enable thallo-importers` (writes the provider into the
-   `config/extensions.php` allow-list and recompiles the extension cache)
+When the capability is off:
 
-## Remove
-
-`./thallo extensions:disable thallo-importers`, then `composer remove glueful/thallo-importers`. After
-removal:
-
-- The headless CMS core boots; content delivery and the admin work unchanged.
+- Content delivery and the admin work unchanged.
 - **Snapshot export/import still works** — the full-database NDJSON snapshot engine
-  (`ContentExporter` / `ContentImporter`), its `/v1/admin/import-export/upload|download`
-  endpoints, and the snapshot UI are **core-owned**, not part of this pack.
-- The `thallo.importers` capability disappears from `GET /v1/admin/capabilities`, so the format-import
-  admin section and the users bulk-CSV import hide automatically.
-
+  (`ContentExporter` / `ContentImporter`), its `/v1/admin/import-export/upload` and
+  `/v1/admin/import-export/jobs/{uuid}/download` endpoints, and the snapshot UI are **core-owned**, not part of this pack.
+- The `thallo.importers` capability drops out of `GET /v1/admin/capabilities`, so the format-import
+  admin section and the users bulk-CSV import hide.
 
 ## Not included (deliberately)
 
