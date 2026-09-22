@@ -16,6 +16,7 @@ use Glueful\Extensions\ImportExport\Support\ImportPlan;
 use Glueful\Extensions\ImportExport\Support\ImportSource;
 use Glueful\Helpers\Utils;
 use Thallo\Contracts\Authoring\ContentWriter;
+use Thallo\Contracts\Authoring\PublishBlocked;
 use Thallo\Contracts\Capability\CapabilityRegistry;
 use Thallo\Contracts\Schema\ContentTypeReader;
 use Thallo\Importers\Concerns\ReadsImportSource;
@@ -139,6 +140,7 @@ final class WordpressContentImporter implements ImporterInterface, RetryableAdap
         $items = array_slice($this->readItemsForJob($context->jobUuid), $batch->offset, $batch->limit);
         $errors = [];
         $processed = 0;
+        $failed = 0;
 
         foreach ($items as $index => $item) {
             $line = $batch->offset + $index + 1;
@@ -174,7 +176,17 @@ final class WordpressContentImporter implements ImporterInterface, RetryableAdap
                     }
                 }
                 $processed++;
+            } catch (PublishBlocked $e) {
+                // The draft is saved; only the publish waits for a review.
+                $processed++;
+                $errors[] = [
+                    'record_number' => $line,
+                    'severity' => 'warning',
+                    'code' => 'wordpress_publish_held',
+                    'message' => 'Saved as a draft, not published: ' . $e->getMessage(),
+                ];
             } catch (\Throwable $e) {
+                $failed++;
                 $errors[] = [
                     'record_number' => $line,
                     'severity' => 'error',
@@ -184,7 +196,7 @@ final class WordpressContentImporter implements ImporterInterface, RetryableAdap
             }
         }
 
-        return new ImportBatchResult($processed, count($errors), $errors, ['mode' => $context->mode]);
+        return new ImportBatchResult($processed, $failed, $errors, ['mode' => $context->mode]);
     }
 
     public function retryable(): bool

@@ -10,6 +10,7 @@ use Glueful\Extensions\ImportExport\Contracts\ImporterInterface;
 use Glueful\Extensions\ImportExport\Contracts\RetryableAdapterInterface;
 use Glueful\Extensions\ImportExport\Support\ImportBatch;
 use Glueful\Extensions\ImportExport\Support\ImportBatchResult;
+use Thallo\Contracts\Authoring\PublishBlocked;
 use Glueful\Extensions\ImportExport\Support\ImportContext;
 use Glueful\Extensions\ImportExport\Support\ImportOptions;
 use Glueful\Extensions\ImportExport\Support\ImportPlan;
@@ -84,13 +85,25 @@ abstract class AbstractCsvImporter implements ImporterInterface, RetryableAdapte
         $prepared = $this->prepare($context);
         $errors = [];
         $processed = 0;
+        $failed = 0;
 
         foreach ($rows as $index => $row) {
             $line = $batch->offset + $index + 1;
             try {
                 $this->importRow($row, $prepared, $context);
                 $processed++;
+            } catch (PublishBlocked $e) {
+                // The draft is saved; only the publish waits for a review. Counting the row as
+                // failed made a retry import it again, as a second draft.
+                $processed++;
+                $errors[] = [
+                    'record_number' => $line,
+                    'severity' => 'warning',
+                    'code' => $this->publishHeldCode(),
+                    'message' => 'Saved as a draft, not published: ' . $e->getMessage(),
+                ];
             } catch (\Throwable $e) {
+                $failed++;
                 $errors[] = [
                     'record_number' => $line,
                     'severity' => 'error',
@@ -100,7 +113,13 @@ abstract class AbstractCsvImporter implements ImporterInterface, RetryableAdapte
             }
         }
 
-        return new ImportBatchResult($processed, count($errors), $errors, ['mode' => $context->mode]);
+        return new ImportBatchResult($processed, $failed, $errors, ['mode' => $context->mode]);
+    }
+
+    /** The warning code for a row saved as a draft because its publish is held for review. */
+    protected function publishHeldCode(): string
+    {
+        return 'publish_held';
     }
 
     public function retryable(): bool

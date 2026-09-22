@@ -153,4 +153,9 @@ final class CsvContentImporter extends AbstractCsvImporter
     {
         return 'csv_import_failed';
     }
+
+    protected function publishHeldCode(): string
+    {
+        return 'csv_publish_held';
+    }
 }

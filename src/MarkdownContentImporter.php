@@ -16,6 +16,7 @@ use Glueful\Extensions\ImportExport\Support\ImportPlan;
 use Glueful\Extensions\ImportExport\Support\ImportSource;
 use Glueful\Helpers\Utils;
 use Thallo\Contracts\Authoring\ContentWriter;
+use Thallo\Contracts\Authoring\PublishBlocked;
 use Thallo\Contracts\Capability\CapabilityRegistry;
 use Thallo\Contracts\Schema\ContentTypeReader;
 use Thallo\Importers\Concerns\ReadsImportSource;
@@ -160,6 +161,14 @@ final class MarkdownContentImporter implements ImporterInterface, RetryableAdapt
             }
 
             return new ImportBatchResult(1, 0, [], ['mode' => $context->mode]);
+        } catch (PublishBlocked $e) {
+            // The draft is saved; only the publish waits for a review.
+            return new ImportBatchResult(1, 0, [[
+                'record_number' => 1,
+                'severity' => 'warning',
+                'code' => 'markdown_publish_held',
+                'message' => 'Saved as a draft, not published: ' . $e->getMessage(),
+            ]], ['mode' => $context->mode]);
         } catch (\Throwable $e) {
             return new ImportBatchResult(0, 1, [[
                 'record_number' => 1,
