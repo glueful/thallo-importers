@@ -130,7 +130,9 @@ final class MarkdownFolderImport
                         'order' => $page->order,
                         'summary' => $page->summary,
                         'source_path' => $relative,
-                        'edit_url' => $editBase === null ? null : $editBase . '/' . $relative,
+                        'edit_url' => $editBase === null || self::neverEdited($relative)
+                            ? null
+                            : $editBase . '/' . $relative,
                     ] as $field => $value
                 ) {
                     if ($value !== null && $has($field)) {
@@ -273,5 +275,18 @@ final class MarkdownFolderImport
         $walk('');
         sort($out);
         return $out;
+    }
+
+    /**
+     * A changelog or a licence page offers no "Edit this page" link: the one is written by the
+     * release process and the other is held word for word to the project's licence — and a
+     * CHANGELOG.md copied in from the project root has no file at the edit address anyway.
+     * Matched by file name, an `NN-` prefix aside: changelog, license, licence.
+     */
+    private static function neverEdited(string $relative): bool
+    {
+        $name = strtolower((string) pathinfo($relative, PATHINFO_FILENAME));
+        $name = (string) preg_replace('/\A\d{1,4}[-_. ]+/', '', $name);
+        return in_array($name, ['changelog', 'license', 'licence'], true);
     }
 }
