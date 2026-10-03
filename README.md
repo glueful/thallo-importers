@@ -48,7 +48,7 @@ new Capability('thallo.importers', label: 'Content importers', description: '…
 
 - **Follows its engine.** The capability's owning package is `glueful/import-export`. Left
   untouched, it is on whenever that extension is enabled, which it is in a new project's
-  `config/extensions.php`. An operator turns it off or on in the admin under **Features**; the switch is stored system-wide and overrides the deploy-time
+  `config/extensions.php`. An operator turns it off or on in the admin under **Extensions › Capabilities**; the switch is stored system-wide and overrides the deploy-time
   `thallo.capabilities` config map. Enabling is refused while `glueful/import-export` is not
   enabled and schema-ready.
 - **Backend-gated, not just UI.** Every adapter calls `assertImportersEnabled()` (the
