@@ -8,6 +8,7 @@ use Glueful\Extensions\DeclaresLoadOrder;
 use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Extensions\ServiceProvider;
 use Thallo\Contracts\Capability\Capability;
+use Thallo\Contracts\Capability\DeclaresCapabilities;
 use Thallo\Contracts\Capability\CapabilityRegistry;
 use Thallo\Importers\CsvContentImporter;
 use Thallo\Importers\CsvUserImporter;
@@ -15,7 +16,7 @@ use Thallo\Importers\MarkdownContentImporter;
 use Thallo\Importers\MarkdownZipImporter;
 use Thallo\Importers\WordpressContentImporter;
 
-final class ImportersServiceProvider extends ServiceProvider implements DeclaresLoadOrder
+final class ImportersServiceProvider extends ServiceProvider implements DeclaresLoadOrder, DeclaresCapabilities
 {
     public static function loadAfter(): array
     {
@@ -85,16 +86,20 @@ final class ImportersServiceProvider extends ServiceProvider implements Declares
         // No routes/config to load; adapters are tag-discovered by glueful/import-export.
     }
 
-    public function boot(ApplicationContext $context): void
+    public function capabilities(): array
     {
-        container($context)->get(CapabilityRegistry::class)->register(
+        return [
             new Capability(
                 'thallo.importers',
                 label: 'Content importers',
                 description: 'CSV, Markdown and WordPress content/user import adapters.',
                 owningPackage: 'glueful/import-export',
             ),
-        );
+        ];
+    }
+
+    public function boot(ApplicationContext $context): void
+    {
         // Console-only (a no-op in the HTTP phase): the folder import a deploy script runs.
         $this->commands([\Thallo\Importers\Console\ImportMarkdownCommand::class]);
     }
