@@ -32,11 +32,15 @@ final class MarkdownZip
      * @param list<string> $keep
      * @param list<string> $exclude
      */
-    public static function count(string $zipPath, array $keep = [], array $exclude = []): int
-    {
+    public static function count(
+        string $zipPath,
+        array $keep = [],
+        array $exclude = [],
+        ?string $within = null,
+    ): int {
         $zip = self::open($zipPath);
         try {
-            return count(self::selected(self::pages($zip), $keep, $exclude));
+            return count(self::selected(self::pages($zip), $keep, $exclude, $within));
         } finally {
             $zip->close();
         }
@@ -56,10 +60,11 @@ final class MarkdownZip
         array $exclude = [],
         int $maxFiles = self::MAX_FILES,
         int $maxBytes = self::MAX_BYTES,
+        ?string $within = null,
     ): array {
         $zip = self::open($zipPath);
         try {
-            $pages = self::selected(self::pages($zip), $keep, $exclude);
+            $pages = self::selected(self::pages($zip), $keep, $exclude, $within);
             if (count($pages) > $maxFiles) {
                 throw new \InvalidArgumentException("The archive holds more than {$maxFiles} Markdown files.");
             }
@@ -148,16 +153,30 @@ final class MarkdownZip
      * The pages an import reads, by the path each has IN the import: the zipped folder set aside,
      * the folders left out gone.
      *
+     * With `$within`, the archive is a repository's (one top folder wrapping everything): only the
+     * pages under `<top folder>/<within>/` are taken, by their path inside it, and the shared-folder
+     * rule does not apply. The match is case-sensitive, as the repository's paths are.
+     *
      * @param array<int,string> $pages
      * @param list<string> $keep
      * @param list<string> $exclude
      * @return array<int,string> index => relative path
      */
-    private static function selected(array $pages, array $keep, array $exclude): array
+    private static function selected(array $pages, array $keep, array $exclude, ?string $within = null): array
     {
-        $prefix = self::sharedFolder(array_values($pages));
-        if (in_array(rtrim($prefix, '/'), $keep, true)) {
-            $prefix = '';
+        if ($within !== null) {
+            $tops = array_unique(array_map(static fn (string $n): string => explode('/', $n)[0], $pages));
+            if (count($tops) > 1 || ($tops !== [] && !str_contains((string) reset($pages), '/'))) {
+                throw new \InvalidArgumentException('The archive has no single top folder to read a folder of.');
+            }
+            $folder = trim($within, '/');
+            $prefix = $tops === [] ? '' : reset($tops) . '/' . ($folder === '' ? '' : $folder . '/');
+            $pages = array_filter($pages, static fn (string $n): bool => str_starts_with($n, $prefix));
+        } else {
+            $prefix = self::sharedFolder(array_values($pages));
+            if (in_array(rtrim($prefix, '/'), $keep, true)) {
+                $prefix = '';
+            }
         }
         $exclude = array_filter(array_map(static fn (string $e): string => trim($e, '/'), $exclude));
         $selected = [];
