@@ -56,6 +56,45 @@ final class MarkdownFolderImport
      */
     public function run(string $dir, array $options): array
     {
+        $read = $this->read($dir, $options);
+
+        $files = [];
+        $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0, 'skipped' => 0, 'failed' => 0];
+        foreach ($read->pages as $page) {
+            try {
+                $row = $this->writePage($read, $page, $options);
+            } catch (ValidationFailed $e) {
+                $row = ['path' => $page->sourcePath, 'slug' => $page->slug]
+                    + self::linksOf($page)
+                    + ['status' => 'failed', 'message' => 'Not valid: ' . json_encode($e->errors())];
+            } catch (\Throwable $e) {
+                $row = ['path' => $page->sourcePath, 'slug' => $page->slug]
+                    + self::linksOf($page)
+                    + ['status' => 'failed', 'message' => $e->getMessage()];
+            }
+            $counts[$row['status']]++;
+            $files[] = $row;
+        }
+
+        return [
+            'type' => $read->type,
+            'dry_run' => (bool) ($options['dry_run'] ?? false),
+            'files' => $files,
+            'missing' => $read->missing,
+            'counts' => $counts,
+        ];
+    }
+
+    /**
+     * Every page of the folder, read and resolved against each other (slugs, sections, links),
+     * and the pages a previous import made from files no longer here. Nothing is written. A
+     * folder holding no Markdown file at all is refused: an import of it would only report every
+     * page gone.
+     *
+     * @param array{type?: string, locale?: string, exclude?: list<string>, body_field?: string} $options
+     */
+    public function read(string $dir, array $options): MarkdownFolderRead
+    {
         $this->assertImportersEnabled($this->capabilities);
 
         $slug = (string) ($options['type'] ?? '');
@@ -76,18 +115,17 @@ final class MarkdownFolderImport
         if ($root === false || !is_dir($root)) {
             throw new \InvalidArgumentException("\"{$dir}\" is not a folder.");
         }
+        $paths = $this->files($root, array_map('strval', (array) ($options['exclude'] ?? [])));
+        if ($paths === []) {
+            throw new \InvalidArgumentException("\"{$dir}\" holds no Markdown files (.md, .mdx, .markdown).");
+        }
 
         $locale = (string) ($options['locale'] ?? 'en');
-        $publish = (bool) ($options['publish'] ?? false);
-        $dryRun = (bool) ($options['dry_run'] ?? false);
-        $actor = is_string($options['actor'] ?? null) ? $options['actor'] : null;
-        $editBase = is_string($options['edit_base'] ?? null) ? rtrim($options['edit_base'], '/') : null;
         $sections = $schema->field('section')?->enumValues() ?? [];
-        $has = static fn (string $field): bool => $schema->field($field) !== null;
 
         // First every file as a page, so the links between them can be resolved.
         $pages = [];
-        foreach ($this->files($root, array_map('strval', (array) ($options['exclude'] ?? []))) as $relative) {
+        foreach ($paths as $relative) {
             $pages[$relative] = MarkdownPage::read(
                 $relative,
                 (string) file_get_contents($root . '/' . $relative),
@@ -100,58 +138,14 @@ final class MarkdownFolderImport
                 $slugByPath[$relative] = $page->slug;
             }
         }
-
-        $files = [];
-        $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0, 'skipped' => 0, 'failed' => 0];
-        $claimed = [];
-        foreach ($pages as $relative => $page) {
-            if ($page->skip) {
-                $files[] = ['path' => $relative, 'slug' => $page->slug, 'status' => 'skipped'];
-                $counts['skipped']++;
-                continue;
-            }
-            $page = $page->withLinks($slugByPath, '/' . $slug);
-            $row = ['path' => $relative, 'slug' => $page->slug];
-            if ($page->brokenLinks !== []) {
-                $row['broken_links'] = $page->brokenLinks;
-            }
-            try {
-                if (isset($claimed[$page->slug])) {
-                    throw new \RuntimeException(
-                        "The URL \"{$page->slug}\" is already {$claimed[$page->slug]}'s in this folder.",
-                    );
-                }
-                $claimed[$page->slug] = $relative;
-
-                $fields = ['title' => $page->title, $bodyField => rtrim($page->body) . "\n"];
-                foreach (
-                    [
-                        'section' => $page->section,
-                        'order' => $page->order,
-                        'summary' => $page->summary,
-                        'source_path' => $relative,
-                        'edit_url' => $editBase === null || self::neverEdited($relative)
-                            ? null
-                            : $editBase . '/' . $relative,
-                    ] as $field => $value
-                ) {
-                    if ($value !== null && $has($field)) {
-                        $fields[$field] = $value;
-                    }
-                }
-                $row += $this->write($typeUuid, $locale, $page, $fields, $publish, $dryRun, $actor);
-            } catch (ValidationFailed $e) {
-                $row += ['status' => 'failed', 'message' => 'Not valid: ' . json_encode($e->errors())];
-            } catch (\Throwable $e) {
-                $row += ['status' => 'failed', 'message' => $e->getMessage()];
-            }
-            $counts[$row['status']]++;
-            $files[] = $row;
+        $resolved = [];
+        foreach ($pages as $page) {
+            $resolved[] = $page->skip ? $page : $page->withLinks($slugByPath, '/' . $slug);
         }
 
         // Pages a previous run made from files that are no longer here: said, never deleted.
         $missing = [];
-        if ($has('source_path')) {
+        if ($schema->field('source_path') !== null) {
             foreach ($this->upserter->fieldValues($typeUuid, $locale, 'source_path') as $entry => $source) {
                 if (!isset($pages[$source])) {
                     $missing[] = ['source_path' => $source, 'entry' => $entry];
@@ -159,7 +153,77 @@ final class MarkdownFolderImport
             }
         }
 
-        return ['type' => $slug, 'dry_run' => $dryRun, 'files' => $files, 'missing' => $missing, 'counts' => $counts];
+        return new MarkdownFolderRead(
+            type: $slug,
+            typeUuid: $typeUuid,
+            locale: $locale,
+            bodyField: $bodyField,
+            pages: $resolved,
+            missing: $missing,
+            fields: array_values(array_filter(
+                ['section', 'order', 'summary', 'source_path', 'edit_url'],
+                static fn (string $field): bool => $schema->field($field) !== null,
+            )),
+        );
+    }
+
+    /**
+     * One page of a read, written (or with `dry_run` only compared). Throws on a page that cannot
+     * be written: the caller decides what its failure leaves behind. A page that claims a URL
+     * another page of the read already has is refused, like a page that is not valid.
+     *
+     * @param array{publish?: bool, dry_run?: bool, edit_base?: ?string, actor?: ?string} $options
+     * @return array{path: string, slug: string, status: string, message?: string, publish_held?: bool,
+     *     broken_links?: list<string>}
+     * @throws ValidationFailed|\Throwable
+     */
+    public function writePage(MarkdownFolderRead $read, MarkdownPage $page, array $options): array
+    {
+        $row = ['path' => $page->sourcePath, 'slug' => $page->slug] + self::linksOf($page);
+        if ($page->skip) {
+            return $row + ['status' => 'skipped'];
+        }
+        foreach ($read->pages as $other) {
+            if ($other === $page) {
+                break;
+            }
+            if (!$other->skip && $other->slug === $page->slug) {
+                throw new \RuntimeException(
+                    "The URL \"{$page->slug}\" is already {$other->sourcePath}'s in this folder.",
+                );
+            }
+        }
+
+        $publish = (bool) ($options['publish'] ?? false);
+        $dryRun = (bool) ($options['dry_run'] ?? false);
+        $actor = is_string($options['actor'] ?? null) ? $options['actor'] : null;
+        $editBase = is_string($options['edit_base'] ?? null) ? rtrim($options['edit_base'], '/') : null;
+        $relative = $page->sourcePath;
+
+        $fields = ['title' => $page->title, $read->bodyField => rtrim($page->body) . "\n"];
+        foreach (
+            [
+                'section' => $page->section,
+                'order' => $page->order,
+                'summary' => $page->summary,
+                'source_path' => $relative,
+                'edit_url' => $editBase === null || self::neverEdited($relative)
+                    ? null
+                    : $editBase . '/' . $relative,
+            ] as $field => $value
+        ) {
+            if ($value !== null && in_array($field, $read->fields, true)) {
+                $fields[$field] = $value;
+            }
+        }
+
+        return $row + $this->write($read->typeUuid, $read->locale, $page, $fields, $publish, $dryRun, $actor);
+    }
+
+    /** @return array{broken_links?: list<string>} */
+    private static function linksOf(MarkdownPage $page): array
+    {
+        return $page->brokenLinks !== [] ? ['broken_links' => $page->brokenLinks] : [];
     }
 
     /**
