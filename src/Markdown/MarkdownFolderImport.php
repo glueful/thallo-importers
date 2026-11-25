@@ -63,6 +63,7 @@ final class MarkdownFolderImport
         foreach ($read->pages as $page) {
             try {
                 $row = $this->writePage($read, $page, $options);
+                unset($row['entry']); // the report keeps its shape; the entry is the sync's to record
             } catch (ValidationFailed $e) {
                 $row = ['path' => $page->sourcePath, 'slug' => $page->slug]
                     + self::linksOf($page)
@@ -228,7 +229,7 @@ final class MarkdownFolderImport
 
     /**
      * @param array<string,mixed> $fields
-     * @return array{status: string, message?: string}
+     * @return array{status: string, entry?: ?string, message?: string}
      */
     private function write(
         string $typeUuid,
@@ -249,7 +250,7 @@ final class MarkdownFolderImport
             }
             $entry = $this->writer->createDraft($typeUuid, $locale, $clean, $actor);
             $this->upserter->assignSlug($entry, $typeUuid, $locale, $page->slug);
-            return ['status' => 'created'] + $this->publish($entry, $locale, $publish, $actor);
+            return ['status' => 'created', 'entry' => $entry] + $this->publish($entry, $locale, $publish, $actor);
         }
 
         $now = $this->upserter->current($entry, $locale);
@@ -258,10 +259,10 @@ final class MarkdownFolderImport
         $sameSlug = $now !== null && $now['slug'] === $page->slug;
         $needsPublish = $publish && $now !== null && !$now['published'];
         if ($sameFields && $sameSlug && !$needsPublish) {
-            return ['status' => 'unchanged'];
+            return ['status' => 'unchanged', 'entry' => $entry];
         }
         if ($dryRun) {
-            return ['status' => $sameFields && $sameSlug ? 'unchanged' : 'updated'];
+            return ['status' => $sameFields && $sameSlug ? 'unchanged' : 'updated', 'entry' => $entry];
         }
         if (!$sameFields) {
             $this->upserter->updateDraft($entry, $locale, $fields, $actor);
@@ -269,7 +270,7 @@ final class MarkdownFolderImport
         if (!$sameSlug) {
             $this->upserter->assignSlug($entry, $typeUuid, $locale, $page->slug);
         }
-        return ['status' => $sameFields && $sameSlug ? 'unchanged' : 'updated']
+        return ['status' => $sameFields && $sameSlug ? 'unchanged' : 'updated', 'entry' => $entry]
             + $this->publish($entry, $locale, $publish, $actor);
     }
 
